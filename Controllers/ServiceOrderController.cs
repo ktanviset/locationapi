@@ -13,6 +13,7 @@ using NPOI.HSSF.UserModel;
 using NPOI.SS.UserModel;
 using System.Data.SqlClient;
 using System.Data;
+using locationapi.AppExtensions;
 
 namespace locationapi.Controllers
 {
@@ -27,86 +28,128 @@ namespace locationapi.Controllers
             configuration = config;
         }
 
-
-        [HttpGet("{id}")]
-        public ActionResult<TodoItem> GetServiceOrder(long id)
-        {
-            var todoItem = new TodoItem();
-            todoItem.Id = id;
-            todoItem.Name = "Test Name";
-
-            if (todoItem == null)
-            {
-                return NotFound();
-            }
-
-            return todoItem;
-        }
-
         [HttpPost]
         [Route("ImportExcelDataSheet")]
-        public async Task<ActionResult> ImportExcelDataSheet(List<IFormFile> files)
+        public async Task<ActionResult<ResponseModel>> ImportExcelDataSheet(List<IFormFile> files)
         {
-            // var connectionString = configuration.GetConnectionString("DefaultConnection");
-
-            // var todoItem = new TodoItem();
-            // todoItem.Id = 100;
-            // todoItem.Name = connectionString +  Directory.GetCurrentDirectory();
-
-
             if (files == null || files.Count == 0)
-                return Content("file not selected");
+                return new ResponseModel() { IsSuccess = false, Message = "file not selected" };
 
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadExcel");//files[0].FileName
+            string fileExtension = Path.GetExtension(files[0].FileName).ToLower();
+            if (!(fileExtension == ".xls" || fileExtension == ".xlsx"))
+                return new ResponseModel() { IsSuccess = false, Message = "file is not excel" };
 
-            string fullPath = Path.Combine(path, files[0].FileName);
-            if (!Directory.Exists(path))
+            int processRow = 0;
+            try
             {
-                Directory.CreateDirectory(path);
-            }
+                string path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "UploadExcel");//files[0].FileName
+                string fullPath = Path.Combine(path, files[0].FileName);
 
-            string sb = "";
-            string sFileExtension = Path.GetExtension(files[0].FileName).ToLower();
-            ISheet sheet;
-            using (var stream = new FileStream(fullPath, FileMode.Create))
-            {
-                await files[0].CopyToAsync(stream);
+                if (!Directory.Exists(path))
+                    Directory.CreateDirectory(path);
 
-                stream.Position = 0;
-                if (sFileExtension == ".xls")
+                int fileRunning = 1;
+                while (System.IO.File.Exists(fullPath))
                 {
-                    HSSFWorkbook hssfwb = new HSSFWorkbook(stream); //This will read the Excel 97-2000 formats  
-                    sheet = hssfwb.GetSheetAt(0); //get first sheet from workbook  
-                }
-                else
-                {
-                    XSSFWorkbook hssfwb = new XSSFWorkbook(stream); //This will read 2007 Excel format  
-                    sheet = hssfwb.GetSheetAt(0); //get first sheet from workbook   
+                    fullPath = Path.Combine(path, $"{Path.GetFileNameWithoutExtension(files[0].FileName)}_{fileRunning}{fileExtension}");
+                    fileRunning++;
                 }
 
-                IRow headerRow = sheet.GetRow(0); //Get Header Row
-                int cellCount = headerRow.LastCellNum;
-
-                for (int i = (sheet.FirstRowNum + 1); i <= sheet.LastRowNum; i++) //Read Excel File
+                ISheet sheet;
+                using (var stream = new FileStream(fullPath, FileMode.Create))
                 {
-                    IRow row = sheet.GetRow(i);
-                    if (row == null) continue;
-                    if (row.Cells.All(d => d.CellType == CellType.Blank)) continue;
-                    for (int j = row.FirstCellNum; j < cellCount; j++)
+                    await files[0].CopyToAsync(stream);
+
+                    stream.Position = 0;
+                    if (fileExtension == ".xls")
                     {
-                        if (row.GetCell(j) != null)
-                            sb += "<td>" + row.GetCell(j).ToString() + "</td>";
+                        HSSFWorkbook hssfwb = new HSSFWorkbook(stream); //This will read the Excel 97-2000 formats  
+                        sheet = hssfwb.GetSheetAt(0); //get first sheet from workbook  
                     }
-                    sb += "</tr>";
+                    else
+                    {
+                        XSSFWorkbook hssfwb = new XSSFWorkbook(stream); //This will read 2007 Excel format  
+                        sheet = hssfwb.GetSheetAt(0); //get first sheet from workbook   
+                    }
+
+                    IRow headerRow = sheet.GetRow(0); //Get Header Row
+                    int cellCount = headerRow.LastCellNum;
+
+                    for (int i = (sheet.FirstRowNum + 1); i <= sheet.LastRowNum; i++) //Read Excel File
+                    {
+                        processRow = i;
+                        IRow row = sheet.GetRow(i);
+                        if (row == null) continue;
+                        if (row.Cells.All(d => d.CellType == CellType.Blank)) continue;
+                        // for (int j = row.FirstCellNum; j < cellCount; j++)
+                        // {
+                        //     if (row.GetCell(j) != null){
+                        //         var value = row.GetCell(j).ToString();
+                        //     }
+                        // }
+                        ImportServiceOrderModel importModel = new ImportServiceOrderModel();
+
+                        importModel.StoreNo                  = $"{row.GetCell(0)}";
+                        importModel.OrderCreationDate           = row.GetCell(1).DateCellValue.ToNullableDateTimeValue();
+                        importModel.DocumentNo               = $"{row.GetCell(2)}";
+                        importModel.ServiceOrderNo           = $"{row.GetCell(3)}";
+                        importModel.ServiceItemNo            = $"{row.GetCell(4)}";
+                        importModel.ServiceName              = $"{row.GetCell(5)}";
+                        importModel.ServiceDate                 = row.GetCell(6).DateCellValue.ToNullableDateTimeValue();
+                        importModel.ServiceTimeSlot          = $"{row.GetCell(7)}";
+                        importModel.ServiceStatus            = $"{row.GetCell(8)}";
+                        importModel.ServiceGoodsValue    = (decimal)row.GetCell(9).NumericCellValue;
+                        importModel.CapacityUnit             = $"{row.GetCell(10)}";
+                        importModel.CapacityValueWeight  = (decimal)row.GetCell(11).NumericCellValue;
+                        importModel.CapacityValueVolume  = (decimal)row.GetCell(12).NumericCellValue;
+                        importModel.BookedQty            = (decimal)row.GetCell(13).NumericCellValue;
+                        importModel.ServicePriceExclVAT  = (decimal)row.GetCell(14).NumericCellValue;
+                        importModel.ServicePriceInclVAT  = (decimal)row.GetCell(15).NumericCellValue;
+                        importModel.PriceCalcMethod          = $"{row.GetCell(16)}";
+                        importModel.NoofItems            = (decimal)row.GetCell(17).NumericCellValue;
+                        importModel.NoofPackages         = (decimal)row.GetCell(18).NumericCellValue;
+                        importModel.TotalOrderValue      = (decimal)row.GetCell(19).NumericCellValue;
+                        importModel.ServiceProviderName      = $"{row.GetCell(20)}";
+                        importModel.ServiceProviderID        = $"{row.GetCell(21)}";
+                        importModel.PaymentStatus            = $"{row.GetCell(22)}";
+                        importModel.PaymenttoIKEA_SP         = $"{row.GetCell(23)}";
+                        importModel.ShipToCustomerName       = $"{row.GetCell(24)}";
+                        importModel.ShipToAddress            = $"{row.GetCell(25)}";
+                        importModel.ShipToAddress2           = $"{row.GetCell(26)}";
+                        importModel.ShipToPostcode           = $"{row.GetCell(27)}";
+                        importModel.ShipToCity               = $"{row.GetCell(28)}";
+                        importModel.ShipToPhoneNo            = $"{row.GetCell(29)}";
+                        importModel.ShipToEmail              = $"{row.GetCell(30)}";
+                        importModel.SellToCustomerName       = $"{row.GetCell(31)}";
+                        importModel.SellToAddress            = $"{row.GetCell(32)}";
+                        importModel.SellToAddress2           = $"{row.GetCell(33)}";
+                        importModel.SellToPostcode           = $"{row.GetCell(34)}";
+                        importModel.SellToCity               = $"{row.GetCell(35)}";
+                        importModel.SellToPhoneNo            = $"{row.GetCell(36)}";
+                        importModel.SellToMobilePhoneNo      = $"{row.GetCell(37)}";
+                        importModel.SellToEmail              = $"{row.GetCell(38)}";
+                        importModel.ServiceComment           = $"{row.GetCell(39)}";
+                        importModel.OrderComment             = $"{row.GetCell(40)}";
+                        importModel.SalesPerson              = $"{row.GetCell(41)}";
+                        importModel.CRMCaseID                = $"{row.GetCell(42)}";
+                        importModel.HandoverDate                = row.GetCell(43).DateCellValue.ToNullableDateTimeValue();
+                        importModel.HandoverTime                = row.GetCell(44).DateCellValue.ToNullableDateTimeValue();
+
+                        await ImportToDb(importModel);
+                    }
                 }
             }
+            catch (Exception e)
+            {
+                return new ResponseModel() { IsSuccess = false, Message = $"Row:{processRow}\r\nMessage:{e.Message}\r\nStackTrace:{e.StackTrace}" };
+            }
 
-            return new OkResult();
+            return new ResponseModel();
         }
 
         [HttpPost]
         [Route("ImportData")]
-        public async Task<ActionResult> ImportData([FromBody] ImportServiceOrderModel serviceOrderModel)
+        public async Task<ActionResult<ResponseModel>> ImportData([FromBody] ImportServiceOrderModel serviceOrderModel)
         {
             try
             {
@@ -114,10 +157,9 @@ namespace locationapi.Controllers
             }
             catch (Exception e)
             {
-
+                return new ResponseModel() { IsSuccess = false, Message = e.Message };
             }
-            return new OkResult();
-
+            return new ResponseModel();
         }
 
         private async Task ImportToDb(ImportServiceOrderModel serviceOrderModel)
@@ -135,17 +177,17 @@ namespace locationapi.Controllers
                 if (serviceOrderModel.ServiceDate.HasValue)                      command.Parameters.Add("@ServiceDate",         SqlDbType.Date).Value     = serviceOrderModel.ServiceDate;
                 if (!string.IsNullOrEmpty(serviceOrderModel.ServiceTimeSlot))    command.Parameters.Add("@ServiceTimeSlot",     SqlDbType.NVarChar).Value = serviceOrderModel.ServiceTimeSlot;
                 if (!string.IsNullOrEmpty(serviceOrderModel.ServiceStatus))      command.Parameters.Add("@ServiceStatus",       SqlDbType.NVarChar).Value = serviceOrderModel.ServiceStatus;
-                if (serviceOrderModel.ServiceGoodsValue.HasValue)                command.Parameters.Add("@ServiceGoodsValue",   SqlDbType.Float).Value    = serviceOrderModel.ServiceGoodsValue;
+                if (serviceOrderModel.ServiceGoodsValue.HasValue)                command.Parameters.Add("@ServiceGoodsValue",   SqlDbType.Decimal).Value  = serviceOrderModel.ServiceGoodsValue;
                 if (!string.IsNullOrEmpty(serviceOrderModel.CapacityUnit))       command.Parameters.Add("@CapacityUnit",        SqlDbType.NVarChar).Value = serviceOrderModel.CapacityUnit;
-                if (serviceOrderModel.CapacityValueWeight.HasValue)              command.Parameters.Add("@CapacityValueWeight", SqlDbType.Float).Value    = serviceOrderModel.CapacityValueWeight;
-                if (serviceOrderModel.CapacityValueVolume.HasValue)              command.Parameters.Add("@CapacityValueVolume", SqlDbType.Float).Value    = serviceOrderModel.CapacityValueVolume;
-                if (serviceOrderModel.BookedQty.HasValue)                        command.Parameters.Add("@BookedQty",           SqlDbType.Float).Value    = serviceOrderModel.BookedQty;
-                if (serviceOrderModel.ServicePriceExclVAT.HasValue)              command.Parameters.Add("@ServicePriceExclVAT", SqlDbType.Float).Value    = serviceOrderModel.ServicePriceExclVAT;
-                if (serviceOrderModel.ServicePriceInclVAT.HasValue)              command.Parameters.Add("@ServicePriceInclVAT", SqlDbType.Float).Value    = serviceOrderModel.ServicePriceInclVAT;
+                if (serviceOrderModel.CapacityValueWeight.HasValue)              command.Parameters.Add("@CapacityValueWeight", SqlDbType.Decimal).Value  = serviceOrderModel.CapacityValueWeight;
+                if (serviceOrderModel.CapacityValueVolume.HasValue)              command.Parameters.Add("@CapacityValueVolume", SqlDbType.Decimal).Value  = serviceOrderModel.CapacityValueVolume;
+                if (serviceOrderModel.BookedQty.HasValue)                        command.Parameters.Add("@BookedQty",           SqlDbType.Decimal).Value  = serviceOrderModel.BookedQty;
+                if (serviceOrderModel.ServicePriceExclVAT.HasValue)              command.Parameters.Add("@ServicePriceExclVAT", SqlDbType.Decimal).Value  = serviceOrderModel.ServicePriceExclVAT;
+                if (serviceOrderModel.ServicePriceInclVAT.HasValue)              command.Parameters.Add("@ServicePriceInclVAT", SqlDbType.Decimal).Value  = serviceOrderModel.ServicePriceInclVAT;
                 if (!string.IsNullOrEmpty(serviceOrderModel.PriceCalcMethod))    command.Parameters.Add("@PriceCalcMethod",     SqlDbType.NVarChar).Value = serviceOrderModel.PriceCalcMethod;
-                if (serviceOrderModel.NoofItems.HasValue)                        command.Parameters.Add("@NoofItems",           SqlDbType.Float).Value    = serviceOrderModel.NoofItems;
-                if (serviceOrderModel.NoofPackages.HasValue)                     command.Parameters.Add("@NoofPackages",        SqlDbType.Float).Value    = serviceOrderModel.NoofPackages;
-                if (serviceOrderModel.TotalOrderValue.HasValue)                  command.Parameters.Add("@TotalOrderValue",     SqlDbType.Float).Value    = serviceOrderModel.TotalOrderValue;
+                if (serviceOrderModel.NoofItems.HasValue)                        command.Parameters.Add("@NoofItems",           SqlDbType.Decimal).Value  = serviceOrderModel.NoofItems;
+                if (serviceOrderModel.NoofPackages.HasValue)                     command.Parameters.Add("@NoofPackages",        SqlDbType.Decimal).Value  = serviceOrderModel.NoofPackages;
+                if (serviceOrderModel.TotalOrderValue.HasValue)                  command.Parameters.Add("@TotalOrderValue",     SqlDbType.Decimal).Value  = serviceOrderModel.TotalOrderValue;
                 if (!string.IsNullOrEmpty(serviceOrderModel.ServiceProviderName))command.Parameters.Add("@ServiceProviderName", SqlDbType.NVarChar).Value = serviceOrderModel.ServiceProviderName;
                 if (!string.IsNullOrEmpty(serviceOrderModel.ServiceProviderID))  command.Parameters.Add("@ServiceProviderID",   SqlDbType.NVarChar).Value = serviceOrderModel.ServiceProviderID;
                 if (!string.IsNullOrEmpty(serviceOrderModel.PaymentStatus))      command.Parameters.Add("@PaymentStatus",       SqlDbType.NVarChar).Value = serviceOrderModel.PaymentStatus;
@@ -170,67 +212,11 @@ namespace locationapi.Controllers
                 if (!string.IsNullOrEmpty(serviceOrderModel.SalesPerson))        command.Parameters.Add("@SalesPerson",         SqlDbType.NVarChar).Value = serviceOrderModel.SalesPerson;
                 if (!string.IsNullOrEmpty(serviceOrderModel.CRMCaseID))          command.Parameters.Add("@CRMCaseID",           SqlDbType.NVarChar).Value = serviceOrderModel.CRMCaseID;
                 if (serviceOrderModel.HandoverDate.HasValue)                     command.Parameters.Add("@HandoverDate",        SqlDbType.Date).Value     = serviceOrderModel.HandoverDate;
-                if (serviceOrderModel.HandoverTime.HasValue)                     command.Parameters.Add("@HandoverTime",        SqlDbType.Time).Value     = serviceOrderModel.HandoverTime;
+                if (serviceOrderModel.HandoverTime.HasValue)                     command.Parameters.Add("@HandoverTime",        SqlDbType.Time).Value     = serviceOrderModel.HandoverTime.Value.ToString("HH:mm:ss");
 
                 conn.Open();
                 await command.ExecuteNonQueryAsync();
             }
         }
-    }
-
-    /*
-    {
-	"StoreNo": "479",
-	"OrderCreationDate": "2019-06-01",
-	"DocumentNo": "R479-19000322",
-	"ServiceOrderNo": "V479-190201910",
-	"ServiceItemNo": "80000510",
-	"ServiceName": "Return Service",
-	"ServiceDate": "2019-06-04",
-	"ServiceTimeSlot": "9:00..12:00",
-	"ServiceStatus": "Waiting for Payment",
-	"ServiceGoodsValue": 600.00,
-	"CapacityUnit": "TRANSPORT",
-	"CapacityValueWeight": 2.4,
-	"CapacityValueVolume": 0.00393,
-	"BookedQty": 1,
-	"ServicePriceExclVAT": 0,
-	"ServicePriceInclVAT": 0,
-	"PriceCalcMethod": "PER SERVIC",
-	"NoofItems": 1,
-	"NoofPackages": 1,
-	"TotalOrderValue": 600.00,
-	"ServiceProviderName": "M-World Logistics (Thailand)",
-	"ServiceProviderID": "SERVPROV1900003",
-	"PaymentStatus": "Not Paid",
-	"PaymenttoIKEA_SP": "Pay to IKEA",
-	"ShipToCustomerName": "ขนิษภา วงษ์พิพัฒน์พันธ์",
-	"ShipToAddress": "5/9 หมู่บ้านมอตโต้ ซ.A1 ถ.กาญจนาภิเษก",
-	"ShipToAddress2": "แขวงบางบอนใต้ เขตบางบอน",
-	"ShipToPostcode": "10150",
-	"ShipToCity": "Bangkok",
-	"ShipToPhoneNo": "+66896622252",
-	"ShipToEmail": "cher_rylee@hotmail.com",
-	"SellToCustomerName": "ขนิษภา วงษ์พิพัฒน์พันธ์",
-	"SellToAddress": "5/9 หมู่บ้านมอตโต้ ซ.A1 ถ.กาญจนาภิเษก",
-	"SellToAddress2": "แขวงบางบอนใต้ เขตบางบอน",
-	"SellToPostcode": "10150",
-	"SellToCity": "Bangkok",
-	"SellToPhoneNo": "+66896622252",
-	"SellToMobilePhoneNo": "+66896622252",
-	"SellToEmail": "cher_rylee@hotmail.com",
-	"ServiceComment": "01/06/19 คุณ ขนิษภา โทร.089-6622252 01/06/19 นำสินค้าตัวใหม่ไปให้สินค้าเก่ากลับมาที่อิเกียเเล้วค่ะ 01/06/19 อิเกียจ่ายค่าจัดส่ง 510 บาท 01/06/19 HD ดูเเลเรื่องค่าประกอบต่อค่ะ 01/06/19 ยืนยันวันนัดเข้าหน้างาน 04/06/2019 เวลา 09.00-12.00 น. ",
-	"OrderComment": "",
-	"SalesPerson": "RADCHANEEW",
-	"CRMCaseID": "",
-	"HandoverDate": "2019-07-05",
-	"HandoverTime": "02:58:30"
-}
-
-    */
-
-    public class TodoItem {
-        public long Id { get; set; }
-        public string Name { get; set; }
     }
 }

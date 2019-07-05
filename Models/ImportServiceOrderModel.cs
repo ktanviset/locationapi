@@ -16,17 +16,17 @@ namespace locationapi.Models
         public DateTime? ServiceDate { get; set; }
         public string ServiceTimeSlot { get; set; }
         public string ServiceStatus { get; set; }
-        public float? ServiceGoodsValue { get; set; }
+        public decimal? ServiceGoodsValue { get; set; }
         public string CapacityUnit { get; set; }
-        public float? CapacityValueWeight { get; set; }
-        public float? CapacityValueVolume { get; set; }
-        public float? BookedQty { get; set; }
-        public float? ServicePriceExclVAT { get; set; }
-        public float? ServicePriceInclVAT { get; set; }
+        public decimal? CapacityValueWeight { get; set; }
+        public decimal? CapacityValueVolume { get; set; }
+        public decimal? BookedQty { get; set; }
+        public decimal? ServicePriceExclVAT { get; set; }
+        public decimal? ServicePriceInclVAT { get; set; }
         public string PriceCalcMethod { get; set; }
-        public float? NoofItems { get; set; }
-        public float? NoofPackages { get; set; }
-        public float? TotalOrderValue { get; set; }
+        public decimal? NoofItems { get; set; }
+        public decimal? NoofPackages { get; set; }
+        public decimal? TotalOrderValue { get; set; }
         public string ServiceProviderName { get; set; }
         public string ServiceProviderID { get; set; }
         public string PaymentStatus { get; set; }
@@ -51,6 +51,6 @@ namespace locationapi.Models
         public string SalesPerson { get; set; }
         public string CRMCaseID { get; set; }
         public DateTime? HandoverDate { get; set; }
-        public TimeSpan? HandoverTime { get; set; }
+        public DateTime? HandoverTime { get; set; }
     }
 }
