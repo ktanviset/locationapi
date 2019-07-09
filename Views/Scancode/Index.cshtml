@@ -1,0 +1,61 @@
+﻿
+@{
+    ViewData["Title"] = "Scan Code";
+}
+
+<h2>Scan Code</h2>
+
+<form class="form-group">
+    Enter Code: <input type="text" class="form-control" id="codeid">
+</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>CodeId</th>
+            <th>ImportTime</th>
+            <th>ExportTime</th>
+        </tr>
+    </thead>
+    <tbody>
+
+    </tbody>
+</table>
+
+@section Scripts{
+    <script>
+        $(function () {
+            console.log('ready!');
+
+            getall();
+
+            $('form').submit(function (e) {
+                $.ajax({
+                    url: 'Scancode/SaveCodeId/' + $('#codeid').val(),
+                    type: 'POST',
+                    data: ''
+                }).done(function (result) {
+                    console.log(result);
+                    $('#codeid').val('');
+                    getall();
+                });
+
+                return false;
+            });
+        });
+
+        function getall() {
+            $.ajax({
+                url: 'Scancode/GetList',
+                type: 'GET',
+                data: ''
+            }).done(function (result) {
+                console.log(result);
+                $('table tbody').empty();
+                $.each(result, function (index, obj) {
+                    $('table tbody').append(`<tr><td>${obj.codeId}</td><td>${obj.importTime}</td><td>${obj.exportTime}</td></tr>`);
+                });
+            });
+        }
+    </script>
+}
