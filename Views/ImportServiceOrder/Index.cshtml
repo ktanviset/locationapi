@@ -1,0 +1,71 @@
+﻿
+@{
+    ViewData["Title"] = "Index";
+}
+
+<h2>ImportServiceOrder</h2>
+<div class="loader"></div>
+<div class="form-group">
+    <a href="~/files/sampletemplate.xlsx" target="_blank">download sample template</a><br>
+    <label for="files">File input</label>
+    <input type="file" class="form-control-file" id="files">
+    <button type="button" class="btn btn-primary btn-sm" id="btnimport">Import</button>
+</div>
+
+@section Scripts{
+    <script>
+        $(function () {
+            console.log('ready!');
+
+            setVisible('.loader', false);
+            setVisible('.form-group', true);
+
+            $('#btnimport').click(function () {
+                setVisible('.loader', true);
+                setVisible('.form-group', false);
+
+                let excel = document.getElementById('files').files[0];
+                let formData = new FormData();
+
+                formData.append("files", excel);
+                fetch('/api/ServiceOrder/ImportExcelDataSheet', { method: 'POST', body: formData })
+                    .then(response => response.json())
+                    .then(obj => {
+                        alert(JSON.stringify(obj));
+                        $('#files').val('');
+                        setVisible('.loader', false);
+                        setVisible('.form-group', true);
+                    });
+            });
+        });
+
+        function setVisible(selector, visible) {
+            document.querySelector(selector).style.display = visible ? 'block' : 'none';
+        }
+    </script>
+}
+
+@section Styles{
+    <style>
+        .loader {
+          border: 16px solid #f3f3f3;
+          border-radius: 50%;
+          border-top: 16px solid #3498db;
+          width: 120px;
+          height: 120px;
+          -webkit-animation: spin 2s linear infinite; /* Safari */
+          animation: spin 2s linear infinite;
+        }
+
+        /* Safari */
+        @@-webkit-keyframes spin {
+          0% { -webkit-transform: rotate(0deg); }
+          100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @@keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+    </style>
+}
