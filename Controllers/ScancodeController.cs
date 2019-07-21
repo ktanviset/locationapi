@@ -56,14 +56,36 @@ namespace locationapi.Controllers
         }
 
         [HttpGet]
-        [Route("GetList")]
-        public ActionResult<List<ScancodeModel>> GetList()
+        [Route("GetList/{datetype}/")]
+        public ActionResult<List<ScancodeModel>> GetList(string datetype, [FromQuery] string datestring)
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             List<ScancodeModel> responde = new List<ScancodeModel>();
             try
             {
-                string sql = "select * from scancode order by import_time desc";
+                string sql = "select * from scancode";
+                var datefromto = datestring.Split("between", 2, StringSplitOptions.None);
+                if (datefromto != null && datefromto.Length == 2)
+                {
+                    bool haswhere = false;
+                    if (!string.IsNullOrWhiteSpace(datefromto[0]))
+                    {
+                        haswhere = true;
+                        sql += $" where {datetype} >= '{datefromto[0].Replace('T', ' ')}'";
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(datefromto[1]))
+                    {
+                        if (haswhere)
+                            sql += " and";
+                        else
+                            sql += " where";
+
+                        sql += $" {datetype} <= '{datefromto[1].Replace('T', ' ')}'";
+                    }
+                }
+
+                sql += " order by import_time desc";
 
                 using (var conn = new SqlConnection(connectionString))
                 using (var command = new SqlCommand(sql, conn))

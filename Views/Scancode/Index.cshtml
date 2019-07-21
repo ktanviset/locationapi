@@ -5,11 +5,44 @@
 
 <h2>Scan Code</h2>
 
-<form class="form-group">
-    Enter Code: <input type="text" class="form-control" id="codeid">
+<form class="form-group" id="mianform">
+    <div class="form-group row">
+        <label for="codeid" class="col-sm-2 col-form-label">Enter Code</label>
+        <div class="col-sm-10">
+            <input type="text" class="form-control" id="codeid">
+        </div>
+    </div>
 </form>
 
-<table class="table">
+<form class="form-group" id="queryform">
+    <div class="form-group row">
+        <label for="datetype" class="col-sm-2 col-form-label">DateType</label>
+        <div class="col-sm-2">
+            <select class="form-control" id="datetype">
+                <option value="import_time">ImportTime</option>
+                <option value="export_time">ExportTime</option>
+            </select>
+        </div>
+
+        <label for="dtp_from" class="col-sm-1 col-form-label">From</label>
+        <div class="col-sm-3">
+            <input size="16" type="text" class="form-control form_datetime" id="dtp_from" readonly>
+            <input type="hidden" class="form-control" id="dtp_from_mirror" readonly>
+        </div>
+
+        <label for="dtp_to" class="col-sm-1 col-form-label">To</label>
+        <div class="col-sm-3">
+            <input size="16" type="text" class="form-control form_datetime" id="dtp_to" readonly>
+            <input type="hidden" class="form-control" id="dtp_to_mirror" readonly>
+        </div>
+    </div>
+    <div class="form-group row">
+        <input class="btn btn-primary" type="submit" value="Submit">
+        <input class="btn btn-primary" type="reset" value="Reset">
+    </div>
+</form>
+
+<table id="resulttable" class="table">
     <thead>
         <tr>
             <th>CodeId</th>
@@ -17,19 +50,51 @@
             <th>ExportTime</th>
         </tr>
     </thead>
-    <tbody>
-
-    </tbody>
+    <tbody></tbody>
 </table>
 
 @section Scripts{
     <script>
+        $("#dtp_from").datetimepicker({
+            format: 'dd MM yyyy - HH:ii p',
+            language: 'th',
+            weekStart: 1,
+            todayBtn: 1,
+            autoclose: 1,
+            todayHighlight: 1,
+            startView: 2,
+            forceParse: 0,
+            showMeridian: 1,
+            linkField: "dtp_from_mirror",
+            linkFormat: "yyyy-mm-ddThh:ii"
+        });
+        $("#dtp_to").datetimepicker({
+            format: 'dd MM yyyy - HH:ii p',
+            language: 'th',
+            weekStart: 1,
+            todayBtn: 1,
+            autoclose: 1,
+            todayHighlight: 1,
+            startView: 2,
+            forceParse: 0,
+            showMeridian: 1,
+            linkField: "dtp_to_mirror",
+            linkFormat: "yyyy-mm-ddThh:ii"
+        });
+
+        //$('#mianform').keypress(function (e) {
+        //    if (e.which == 13) {
+        //        $('#mianform').submit();
+        //        return false;    //<---- Add this line
+        //    }
+        //});
+
         $(function () {
             console.log('ready!');
 
             getall();
 
-            $('form').submit(function (e) {
+            $('#mianform').submit(function (e) {
                 $.ajax({
                     url: 'Scancode/SaveCodeId/' + $('#codeid').val(),
                     type: 'POST',
@@ -42,18 +107,33 @@
 
                 return false;
             });
+
+            $('#queryform').submit(function (e) {
+                getall();
+                return false;
+            });
+
+
+            $('#queryform').on('reset', function (e) {
+                $('#dtp_from').val('');
+                $('#dtp_to').val('');
+                $('#dtp_from_mirror').val('');
+                $('#dtp_to_mirror').val('');
+            });
         });
 
         function getall() {
+            let url = `Scancode/GetList/${$('#datetype').val()}/?datestring=${$('#dtp_from_mirror').val()}between${$('#dtp_to_mirror').val()}`
+
             $.ajax({
-                url: 'Scancode/GetList',
+                url: url,//'Scancode/GetList',
                 type: 'GET',
                 data: ''
             }).done(function (result) {
                 console.log(result);
-                $('table tbody').empty();
+                $('#resulttable tbody').empty();
                 $.each(result, function (index, obj) {
-                    $('table tbody').append(`<tr><td>${obj.codeId}</td><td>${obj.importTime}</td><td>${obj.exportTime}</td></tr>`);
+                    $('#resulttable tbody').append(`<tr><td>${obj.codeId}</td><td>${obj.importTime}</td><td>${obj.exportTime}</td></tr>`);
                 });
             });
         }
